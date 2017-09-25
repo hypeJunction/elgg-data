@@ -1,0 +1,30 @@
+{
+	"name": "hypejunction/elgg-data",
+	"type": "elgg-plugin",
+	"description": "Provides adapters and endpoints for exporting entities and lists",
+	"homepage": "http://hypejunction.com",
+	"keywords": [
+		"elgg",
+		"plugin",
+		"json",
+		"api",
+		"data source"
+	],
+	"license": "GPL-2.0",
+	"authors": [
+		{
+			"name": "Ismayil Khayredinov",
+			"email": "info@hypejunction.com"
+		}
+	],
+	"require": {
+		"php": ">=5.5",
+		"composer/installers": "~1.0"
+	},
+	"autoload": {
+		"psr-0": {
+			"": "classes/"
+		}
+	}
+}
+

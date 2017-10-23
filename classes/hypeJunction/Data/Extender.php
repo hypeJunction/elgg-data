@@ -2,6 +2,8 @@
 
 namespace hypeJunction\Data;
 
+use ElggEntity;
+
 class Extender {
 
 	/**
@@ -17,12 +19,14 @@ class Extender {
 	public static function addData($hook, $type, $return, $params) {
 
 		$entity = elgg_extract('entity', $params);
-		/* @var $entity \ElggEntity */
+		/* @var $entity ElggEntity */
 
 		$type = $entity->type;
 		$subtype = $entity->getSubtype();
 
-		$icon_sizes = array_keys((array) elgg_get_icon_sizes($type, $subtype));
+		$return['display_name'] = $entity->getDisplayName();
+		$return['time_created'] = $entity->time_created;
+		$return['time_updated'] = $entity->time_updated;
 
 		$return['location'] = $entity->getLocation();
 		$return['latitude'] = $entity->getLatitude();
@@ -30,12 +34,16 @@ class Extender {
 
 		$return['status'] = $entity->status;
 
-		$return['read_access'] = [
-			'id' => $entity->access_id,
-			'label' => get_readable_access_level($entity->access_id),
-		];
+		foreach (['excerpt', 'briefdescription', 'description'] as $prop) {
+			if ($entity->$prop) {
+				$return['summary'] = elgg_get_excerpt($entity->$prop);
+				break;
+			}
+		}
 
 		$return['_links']['icons'] = [];
+
+		$icon_sizes = array_keys((array) elgg_get_icon_sizes($type, $subtype));
 
 		foreach ($icon_sizes as $icon_size) {
 			$return['_links']['icons'][$icon_size] = $entity->getIconURL($icon_size);
@@ -43,13 +51,23 @@ class Extender {
 
 		$tag_names = elgg_get_registered_tag_metadata_names();
 		foreach ($tag_names as $tag_name) {
-			$return[$tag_name] = (array) $entity->$tag_name;
+			$return[$tag_name] = [];
+			foreach ((array) $entity->$tag_name as $tag) {
+				$return[$tag_name][] = [
+					'label' => $tag,
+					'url' => elgg_http_add_url_query_elements(elgg_normalize_url('search'), [
+						'q' => $tag,
+						'search_type' => 'tags',
+					]),
+				];
+			}
 		}
 
-		if ($entity instanceof \ElggFile) {
-			$return['_links']['download'] = elgg_get_download_url($entity);
-			$return['_links']['inline'] = elgg_get_inline_url($entity);
-		}
+		$return['search'] = [
+			'title' => $entity->getVolatileData('search_matched_title'),
+			'description' => $entity->getVolatileData('search_matched_description'),
+			'extra' => $entity->getVolatileData('search_matched_extra'),
+		];
 
 		return $return;
 	}
@@ -67,7 +85,7 @@ class Extender {
 	public static function addPermissions($hook, $type, $return, $params) {
 
 		$entity = elgg_extract('entity', $params);
-		/* @var $entity \ElggEntity */
+		/* @var $entity ElggEntity */
 
 		$type = $entity->type;
 		$subtype = $entity->getSubtype();
@@ -86,7 +104,6 @@ class Extender {
 				$return['_permissions']['write'][$type] = $entity->canWriteToContainer(0, $type);
 			}
 		}
-
 
 		$annotations = [
 			'likes',
@@ -162,9 +179,10 @@ class Extender {
 			$return[$field] = $entity->$field;
 		}
 
-		$return['content_access_mode'] = $entity->getContentAccessMode();
-		$return['membership'] = $entity->membership;
-		$return['group_acl'] = $entity->group_acl;
+		$return['access'] = self::getAccessData($entity);
+		$return['access']['content_access_mode'] = $entity->getContentAccessMode();
+		$return['access']['membership'] = $entity->membership;
+		$return['access']['group_acl'] = $entity->group_acl;
 
 		$return['_counters']['members'] = $entity->getFriends(['count' => true]);
 		$return['_links']['members'] = elgg_http_add_url_query_elements("group/members", [
@@ -175,6 +193,36 @@ class Extender {
 		$return['_relationships']['member'] = $entity->isMember($user);
 
 		return $return;
+	}
+
+	/**
+	 * Add object data
+	 *
+	 * @param string $hook   "adapter:entity"
+	 * @param string $type   "object"
+	 * @param array  $return Data
+	 * @param array  $params Hook params
+	 *
+	 * @return array
+	 */
+	public static function addObjectData($hook, $type, $return, $params) {
+
+		$entity = elgg_extract('entity', $params);
+		/* @var $entity \ElggObject */
+
+		$return['access'] = self::getAccessData($entity);
+
+		if ($entity instanceof \ElggFile) {
+			$return['_links']['download'] = elgg_get_download_url($entity);
+			$return['_links']['inline'] = elgg_get_inline_url($entity);
+
+			$return['media'] = [
+				'display' => 'image',
+				'src' => $entity->getIconURL('large'),
+			];
+
+			return $return;
+		}
 	}
 
 	/**
@@ -190,7 +238,7 @@ class Extender {
 	public static function addCounters($hook, $type, $return, $params) {
 
 		$entity = elgg_extract('entity', $params);
-		/* @var $entity \ElggEntity */
+		/* @var $entity ElggEntity */
 
 		$type = $entity->type;
 		$subtype = $entity->getSubtype();
@@ -261,5 +309,42 @@ class Extender {
 		}
 
 		return $return;
+	}
+
+	/**
+	 * Returns entity access info
+	 *
+	 * @param ElggEntity $entity
+	 *
+	 * @return array
+	 */
+	public static function getAccessData(ElggEntity $entity) {
+
+		$access = $entity->access_id;
+		$icon = function () use ($access) {
+			switch ($access) {
+				case ACCESS_FRIENDS :
+					$icon_name = 'user';
+					break;
+				case ACCESS_PUBLIC :
+				case ACCESS_LOGGED_IN :
+					$icon_name = 'globe';
+					break;
+				case ACCESS_PRIVATE :
+					$icon_name = 'lock';
+					break;
+				default:
+					$icon_name = 'cog';
+					break;
+			}
+
+			return $icon_name;
+		};
+
+		return [
+			'id' => $entity->access_id,
+			'icon' => $icon(),
+			'label' => get_readable_access_level($entity->access_id),
+		];
 	}
 }

@@ -34,6 +34,9 @@ class ElggListAdapter {
 	 */
 	public function export(array $params = []) {
 
+		$viewtype = elgg_get_viewtype();
+		elgg_set_viewtype('default');
+
 		$options = $this->prepare();
 
 		$batch = new \ElggBatch('elgg_get_entities_from_attributes', $options);
@@ -43,6 +46,7 @@ class ElggListAdapter {
 			'limit' => $options['limit'],
 			'offset' => $options['offset'],
 			'items' => [],
+			'_related' => [],
 		];
 
 		if (elgg_get_config('debug')) {
@@ -52,7 +56,23 @@ class ElggListAdapter {
 		foreach ($batch as $entity) {
 			$adapter = new ElggEntityAdapter($entity);
 			$data['items'][] = $adapter->export($params);
+
+			if ($owner = $entity->getOwnerEntity()) {
+				if (!isset($data['_related'][$owner->guid])) {
+					$adapter = new ElggEntityAdapter($owner);
+					$data['_related'][$owner->guid] = $adapter->export($params);
+				}
+			}
+
+			if ($container = $entity->getContainerEntity()) {
+				if (!isset($data['_related'][$container->guid])) {
+					$adapter = new ElggEntityAdapter($container);
+					$data['_related'][$container->guid] = $adapter->export($params);
+				}
+			}
 		}
+
+		$data['_related'] = array_values($data['_related']);
 
 		$url = current_page_url();
 		$url = substr($url, strlen(elgg_get_site_url()));
@@ -77,6 +97,8 @@ class ElggListAdapter {
 		} else {
 			$data['_links']['next'] = false;
 		}
+
+		elgg_set_viewtype($viewtype);
 
 		return $data;
 	}
@@ -113,14 +135,14 @@ class ElggListAdapter {
 		}
 
 		if (!isset($options['limit'])) {
-			$options['limit'] = get_input('limit', elgg_get_config('default_limit'));
+			$options['limit'] = (int) get_input('limit', elgg_get_config('default_limit'));
 		}
 		if ($options['limit'] > self::MAX_ITEMS) {
 			$options['limit'] = self::MAX_ITEMS;
 		}
 
 		if (!isset($options['offset'])) {
-			$options['offset'] = get_input('offset', 0);
+			$options['offset'] = (int) get_input('offset', 0);
 		}
 
 		unset($options['count']);

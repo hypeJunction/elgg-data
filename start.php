@@ -24,4 +24,10 @@ elgg_register_event_handler('init', 'system', function () {
 
 	elgg_register_plugin_hook_handler('adapter:entity', 'user', [Extender::class, 'addUserData']);
 	elgg_register_plugin_hook_handler('adapter:entity', 'group', [Extender::class, 'addGroupData']);
+	elgg_register_plugin_hook_handler('adapter:entity', 'object', [Extender::class, 'addObjectData']);
+
+	elgg_register_plugin_hook_handler('elgg.data', 'page', [\hypeJunction\Data\Page::class, 'captureContext']);
+
+	elgg_extend_view('elgg.js', 'elgg/data/context.js');
+	
 });

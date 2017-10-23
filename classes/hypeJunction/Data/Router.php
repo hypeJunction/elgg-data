@@ -34,24 +34,26 @@ class Router {
 				throw new HttpException('Unknown resource', ELGG_HTTP_NOT_IMPLEMENTED);
 			}
 
+			Page::restoreContext();
+
 			$json = elgg_view_resource("data/$resource");
 			if (!$json) {
 				$json = json_encode(new \stdClass());
 			}
 
-			$result = json_decode($json, true);
+			$payload = json_decode($json, true);
 
 			$response = [
 				'status' => ELGG_HTTP_OK,
 				'message' => 'OK',
-				'result' => $result,
+				'payload' => $payload,
 			];
 		} catch (\Exception $ex) {
 			$status = $ex->getCode() ? : ELGG_HTTP_INTERNAL_SERVER_ERROR;
 			$response = [
 				'status' => $status,
 				'message' => $ex->getMessage(),
-				'result' => new \stdClass(),
+				'payload' => new \stdClass(),
 			];
 
 			if ($log_level) {

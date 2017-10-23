@@ -12,10 +12,10 @@ $public_metadata = array_merge($public_metadata, (array) elgg_get_registered_tag
 $public_metadata = elgg_trigger_plugin_hook('public_metadata', 'search', [], $public_metadata);
 
 $options = [
-	'types' => get_input('type'),
-	'subtypes' => get_input('subtype'),
-	'owner_guids' => get_input('owner_guid'),
-	'container_guids' => get_input('container_guid'),
+	'types' => get_input('types'),
+	'subtypes' => get_input('subtypes'),
+	'owner_guids' => get_input('owner_guids'),
+	'container_guids' => get_input('container_guids'),
 ];
 
 $metadata = get_input('metadata');
@@ -30,6 +30,9 @@ if (is_array($metadata)) {
 		];
 	}
 }
+
+$options['query'] = get_input('query');
+$options['sort'] = get_input('sort');
 
 $adapter = new \hypeJunction\Data\ElggListAdapter($options);
 $data = $adapter->export();

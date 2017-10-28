@@ -37,7 +37,7 @@ class ElggListAdapter {
 		$viewtype = elgg_get_viewtype();
 		elgg_set_viewtype('default');
 
-		$options = $this->prepare();
+		$options = $this->prepare($params);
 
 		$batch = new \ElggBatch('elgg_get_entities_from_attributes', $options);
 
